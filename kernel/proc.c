@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "scheduling.h"
 
 struct cpu cpus[NCPU];
 
@@ -242,7 +243,7 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
+  put(p); //TODO
 
   release(&p->lock);
 }
@@ -312,7 +313,7 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->state = RUNNABLE;
+  put(np); //TODO
   release(&np->lock);
 
   return pid;
@@ -445,7 +446,16 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
+    p=get();
+    if(p!=0){
+        acquire(&p->lock);
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        c->proc = 0;
+        release(&p->lock);
+    }
+    /*for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
@@ -460,7 +470,7 @@ scheduler(void)
         c->proc = 0;
       }
       release(&p->lock);
-    }
+    }*/
   }
 }
 
@@ -497,8 +507,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
-  sched();
+  contextChange(p);
   release(&p->lock);
 }
 
@@ -565,7 +574,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        p->state = RUNNABLE;
+        put(p); //TODO
       }
       release(&p->lock);
     }
@@ -586,7 +595,7 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
-        p->state = RUNNABLE;
+        put(p); //TODO
       }
       release(&p->lock);
       return 0;
