@@ -105,4 +105,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int tn; // T_n
+  int tn1; // T_n+1, ono po cemu uopste poredimo
+  int tstart; // timestamp
+  int lastdur; //poslednja duzina
+  int usedCnt; //koliko puta je dobio jedan od procesora na izvrsavanje
 };

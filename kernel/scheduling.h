@@ -9,7 +9,7 @@
 struct proc;
 
 extern short scheduleMode;
-
+extern int alpha;
 struct proc* get();
 void put(struct proc* p);
 

@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "scheduling.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -77,7 +78,7 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2 && scheduleMode!=0)
     yield();
 
   usertrapret();
@@ -150,7 +151,7 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && scheduleMode!=0)
     yield();
 
   // the yield() may have caused some traps to occur,
