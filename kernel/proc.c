@@ -451,7 +451,8 @@ scheduler(void)
         acquire(&p->lock);
         p->state = RUNNING;
         c->proc = p;
-        p->tstart=ticks;
+        if(scheduleMode!=2)
+            p->tstart=ticks;
         p->usedCnt++;
         swtch(&c->context, &p->context);
         c->proc = 0;

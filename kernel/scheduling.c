@@ -11,17 +11,38 @@
 #include "scheduling.h"
 
 struct proc* procesi[NPROC];
-short scheduleMode=0; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
+short scheduleMode=2; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
 struct spinlock schedL;
 int alpha = 50;
 int brProcesa=0;
 
-struct proc* get(){
+struct proc* getSJF(){
     struct proc* res=0;
-    acquire(&schedL);
     if(brProcesa>0){
         res=procesi[--brProcesa];
     }
+    return res;
+}
+
+struct proc* getCFS(){
+    struct proc* res=0;
+    if(brProcesa==0) return res;
+    res=procesi[--brProcesa];
+    res->timeSlice=(brProcesa==0)?2:(ticks-res->lastdur-res->tstart); //2 ako nema sta drugo
+    if(res->timeSlice<1)res->timeSlice=1; //ako mu je dodeljen neki bangav timeslice
+
+    res->lastdur+=res->timeSlice;
+
+    return res;
+}
+
+struct proc* get(){
+    struct proc* res=0;
+    acquire(&schedL);
+    if(scheduleMode==2)
+        res=getCFS();
+    else
+        res=getSJF();
     release(&schedL);
     return res;
 }
@@ -62,11 +83,35 @@ void putSJF(struct proc* p){
 
     brProcesa++;
 }
+void putCFS(struct proc* p){
+    if(p->state==USED||p->state==SLEEPING){ //ovde radim inicijalizaciju procesa
+        p->tstart=ticks;
+        p->lastdur=0;
+    }
+    p->state=RUNNABLE;
 
+    int curr;
+    if(brProcesa==0){
+        procesi[0]=p;
+    }else{
+        for(curr=brProcesa;curr>0;curr--){
+            if(procesi[curr-1]->lastdur>p->lastdur)
+                break;
+
+            procesi[curr]=procesi[curr-1];
+        }
+        procesi[curr]=p;
+    }
+
+    brProcesa++;
+}
 
 void put(struct proc* p){
     acquire(&schedL);
-    putSJF(p);
+    if(scheduleMode==2)
+        putCFS(p);
+    else
+        putSJF(p);
     release(&schedL);
 }
 
@@ -87,7 +132,11 @@ void contextChange(struct proc* p){ //koristi se u trap.c, kada dodje prekid od 
         }
     }
     else if(scheduleMode==2){ //CFS
-
+        if(--p->timeSlice==0){
+            release(&schedL);
+            yield();
+            return;
+        }
     }
     release(&schedL);
 }
