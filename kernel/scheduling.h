@@ -15,4 +15,5 @@ void put(struct proc* p);
 
 void contextChange(struct proc* p);
 int schedulePeek();
+int changeSchAlgo(int algo,int alpha);
 #endif //XV6_OS2_SCHEDULING_H

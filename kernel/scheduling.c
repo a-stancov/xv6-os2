@@ -11,7 +11,7 @@
 #include "scheduling.h"
 
 struct proc* procesi[NPROC];
-short scheduleMode=1; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
+short scheduleMode=0; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
 struct spinlock schedL;
 int alpha = 50;
 int brProcesa=0;
@@ -19,14 +19,15 @@ int brProcesa=0;
 struct proc* get(){
     struct proc* res=0;
     acquire(&schedL);
-    if(brProcesa>0)
+    if(brProcesa>0){
         res=procesi[--brProcesa];
+    }
     release(&schedL);
     return res;
 }
 
-void put(struct proc* p){
-    acquire(&schedL);
+
+void putSJF(struct proc* p){
     if(p->state==USED){ //ovde radim inicijalizaciju procesa
         p->tn1=0;
         p->usedCnt=0;
@@ -46,8 +47,6 @@ void put(struct proc* p){
     }
     p->state=RUNNABLE;
 
-
-
     int curr;
     if(brProcesa==0){
         procesi[0]=p;
@@ -62,26 +61,25 @@ void put(struct proc* p){
     }
 
     brProcesa++;
+}
+
+
+void put(struct proc* p){
+    acquire(&schedL);
+    putSJF(p);
     release(&schedL);
 }
 
+
 int schedulePeek(){
-    int res;
-    //acquire(&schedL);
-    if(brProcesa==0)
-        res=-1;
-    else
-        res=procesi[brProcesa-1]->tn1-procesi[brProcesa-1]->lastdur;
-    //release(&schedL);
-    return res;
+    return procesi[brProcesa-1]->tn1-procesi[brProcesa-1]->lastdur;
 }
 
 
 void contextChange(struct proc* p){ //koristi se u trap.c, kada dodje prekid od timera
     acquire(&schedL);
     if(scheduleMode==1){ //SJF sa preotimanjem
-        int temp=schedulePeek();
-        if(temp!=-1 && temp<p->tn1-p->lastdur-(ticks-p->tstart)){
+        if(brProcesa!=0 && schedulePeek()<p->tn1-p->lastdur-(ticks-p->tstart)){
             p->taken=1;
             release(&schedL);
             yield();
@@ -92,5 +90,4 @@ void contextChange(struct proc* p){ //koristi se u trap.c, kada dodje prekid od 
 
     }
     release(&schedL);
-
 }

@@ -78,7 +78,7 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && scheduleMode!=0)
+  if(which_dev == 2)
       contextChange(myproc());//ovde je ranije bio yield
 
   usertrapret();
