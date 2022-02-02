@@ -111,4 +111,5 @@ struct proc {
   int tstart; // timestamp
   int lastdur; //poslednja duzina
   int usedCnt; //koliko puta je dobio jedan od procesora na izvrsavanje
+  int taken;
 };

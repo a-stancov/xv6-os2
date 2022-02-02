@@ -10,40 +10,87 @@
 #include "defs.h"
 #include "scheduling.h"
 
-extern struct proc proc[NPROC];
-short scheduleMode=0; //prima vrednosti 0 ili 1 , 0 za SJF bez preuzimanja, 1 za CFS
+struct proc* procesi[NPROC];
+short scheduleMode=1; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
 struct spinlock schedL;
 int alpha = 50;
+int brProcesa=0;
 
 struct proc* get(){
-    struct proc* res=0,*p;
+    struct proc* res=0;
     acquire(&schedL);
-    for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        if(p->state==RUNNABLE && (res==0||res->tn1>p->tn1||(res->tn1==p->tn1 && res->usedCnt>p->usedCnt))){
-            res=p;
-        }
-        release(&p->lock);
-    }
+    if(brProcesa>0)
+        res=procesi[--brProcesa];
     release(&schedL);
     return res;
 }
 
 void put(struct proc* p){
     acquire(&schedL);
-    if(p->state==USED){
+    if(p->state==USED){ //ovde radim inicijalizaciju procesa
         p->tn1=0;
         p->usedCnt=0;
+        p->lastdur=0;
+        p->taken=0;
     }
     else{
-        p->tn=p->tn1;
-        p->tn1 = (alpha*(ticks-p->tstart)+(100-alpha)*p->tn)/100;
+        if(!p->taken){
+            p->tn=p->tn1;
+            p->tn1 = (alpha*(p->lastdur+ticks-p->tstart)+(100-alpha)*p->tn)/100;
+            p->lastdur=0;
+        }else{
+            p->lastdur+=ticks-p->tstart;
+            p->taken=0;
+        }
+
     }
     p->state=RUNNABLE;
+
+
+
+    int curr;
+    if(brProcesa==0){
+        procesi[0]=p;
+    }else{
+        for(curr=brProcesa;curr>0;curr--){
+            if(procesi[curr-1]->tn1-procesi[curr-1]->lastdur>p->tn1-p->lastdur)
+                break;
+
+            procesi[curr]=procesi[curr-1];
+        }
+        procesi[curr]=p;
+    }
+
+    brProcesa++;
     release(&schedL);
 }
 
-void contextChange(struct proc* p){
-    put(p);
-    sched();
+int schedulePeek(){
+    int res;
+    //acquire(&schedL);
+    if(brProcesa==0)
+        res=-1;
+    else
+        res=procesi[brProcesa-1]->tn1-procesi[brProcesa-1]->lastdur;
+    //release(&schedL);
+    return res;
+}
+
+
+void contextChange(struct proc* p){ //koristi se u trap.c, kada dodje prekid od timera
+    acquire(&schedL);
+    if(scheduleMode==1){ //SJF sa preotimanjem
+        int temp=schedulePeek();
+        if(temp!=-1 && temp<p->tn1-p->lastdur-(ticks-p->tstart)){
+            p->taken=1;
+            release(&schedL);
+            yield();
+            return;
+        }
+    }
+    else if(scheduleMode==2){ //CFS
+
+    }
+    release(&schedL);
+
 }

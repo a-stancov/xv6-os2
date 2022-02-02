@@ -509,7 +509,8 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  contextChange(p);
+  put(p);
+  sched();
   release(&p->lock);
 }
 
