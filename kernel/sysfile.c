@@ -492,5 +492,5 @@ sys_changeSchAlgo(void){
 
     if(argint(0,&algo)<0||argint(1,&alpha)<0) return -1;
 
-    return 0;//changeSchAlgo(algo,alpha);
+    return changeSchAlgo(algo,alpha);
 }

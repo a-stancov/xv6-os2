@@ -39,7 +39,7 @@ void p1(int id, int length) {
 
 void p2(int id, int length) {
     for (int i = 0; i < length; i++) {
-        sleep(1);//TODO vratiti na random()
+        sleep(random());//TODO vratiti na random()
 
         do_work(length / 10);
         printf("P%d iteration=%d\n", id, i);

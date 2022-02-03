@@ -11,6 +11,7 @@
 #include "scheduling.h"
 
 struct proc* procesi[NPROC];
+extern struct proc proc[NPROC];
 short scheduleMode=2; //prima vrednosti 0 ili 1 ili 2 , 0 za SJF bez preuzimanja, 1 za SJF sa preuzimanjem , 2 za CFS
 struct spinlock schedL;
 int alpha = 50;
@@ -28,7 +29,7 @@ struct proc* getCFS(){
     struct proc* res=0;
     if(brProcesa==0) return res;
     res=procesi[--brProcesa];
-    res->timeSlice=(brProcesa==0)?2:(ticks-res->lastdur-res->tstart); //2 ako nema sta drugo
+    res->timeSlice=(brProcesa==0)?2:(ticks-res->lastdur-res->tstart)/brProcesa; //2 ako nema sta drugo
     if(res->timeSlice<1)res->timeSlice=1; //ako mu je dodeljen neki bangav timeslice
 
     res->lastdur+=res->timeSlice;
@@ -84,7 +85,7 @@ void putSJF(struct proc* p){
     brProcesa++;
 }
 void putCFS(struct proc* p){
-    if(p->state==USED||p->state==SLEEPING){ //ovde radim inicijalizaciju procesa
+    if(p->state==USED||p->state==SLEEPING){ // inicijalizacija + ako udje jer se odrekao
         p->tstart=ticks;
         p->lastdur=0;
     }
@@ -139,4 +140,59 @@ void contextChange(struct proc* p){ //koristi se u trap.c, kada dodje prekid od 
         }
     }
     release(&schedL);
+}
+int changeSchAlgo(int algo,int alpha2){
+    acquire(&schedL);
+    if(algo<0||algo>2){
+        release(&schedL);
+        return -2;
+    }
+    if(algo!=2&&(alpha<0||alpha>100)){
+        release(&schedL);
+        return -3;
+    }
+    struct proc* p;
+    if(scheduleMode==2&&algo!=2){ //prelaz sa CFS na SJF
+        for(p = proc; p < &proc[NPROC]; p++) {
+            acquire(&p->lock);
+            if(p->state!=UNUSED){
+                p->lastdur=0;
+                p->tn1=0;
+                p->tstart=ticks; //ako je running okej, a ako nije running svakako ce se ovo promeniti nakon get u scheduler
+            }
+            release(&p->lock);
+        }
+        alpha=alpha2;
+        scheduleMode=algo;
+        release(&schedL);
+        return 1;
+    }
+    else if(scheduleMode!=2&&algo==2){//prelas sa SJF na CFS
+        for(p = proc; p < &proc[NPROC]; p++) {
+            acquire(&p->lock);
+            if(p->state==RUNNING){
+                p->timeSlice=2;
+                p->lastdur=p->timeSlice;
+                p->tstart=ticks;
+            }
+            else if(p->state!=UNUSED){
+                p->tstart=ticks;
+                p->lastdur=0;
+            }
+            release(&p->lock);
+        }
+        scheduleMode=algo;
+        release(&schedL);
+        return 2;
+    }
+    else if(algo==1||algo==0){ //SJF na SJF
+        alpha=alpha2;
+        scheduleMode=algo;
+        release(&schedL);
+        return 3;
+    }
+    //ostao je samo slucaj algo ==2 i scheduleMode==2, ali to je CFS->CFS pa tu nema razloga nista menjati
+
+    release(&schedL);
+    return 4;
 }
